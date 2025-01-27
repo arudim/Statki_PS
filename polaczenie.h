@@ -5,7 +5,8 @@ enum
     ZAPROSZENIE,
     STRZAL,
     PLANSZA,
-    DAJSTRZAL
+    DAJSTRZAL,
+    KONIECGRY
 }KOMNEDY;
 
  typedef struct 

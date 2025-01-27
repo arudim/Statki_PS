@@ -16,6 +16,8 @@ ClientData daneodklienta;
 int clientCount = 0;
 int index_klienta = 0;
 
+int wygrana = 1;
+
 pthread_mutex_t clientsMutex = PTHREAD_MUTEX_INITIALIZER;
 
 int is_valid_position(char board[10][10], int x, int y, int size,
@@ -54,7 +56,7 @@ void place_ship(char board[10][10], int x, int y, int size, char orientation,
 void set_board(char board[10][10]) {
   char ships[4] = {'A', 'B', 'C', 'D'};
   int sizes[4] = {4, 3, 2, 1};
-  int counts[4] = {1, 2, 3, 4};
+  int counts[4] = {0, 0, 0, 1};
   int x, y, size, ship_index;
   char orientation;
 
@@ -95,10 +97,7 @@ void handleClient(int clientSocket) {
     memcpy(&daneodklienta, &buffer, sizeof(daneodklienta));
 
     printf("daneodklienta.komenda=%d\n:", daneodklienta.komenda);
-    /*for (int i = 0; i < sizeof(daneodklienta); i++)
-      printf("%c(%d),", ((char *)&daneodklienta)[i],
-             ((char *)&daneodklienta)[i]);
-    printf("\n\n");*/
+
     switch (daneodklienta.komenda) {
     case PRZEDSTAWIENIE:
       printf("Klient: %s\n", daneodklienta.username);
@@ -142,6 +141,24 @@ void handleClient(int clientSocket) {
             clients[index_klienta].data.plansza[x][y] == 'C' ||
             clients[index_klienta].data.plansza[x][y] == 'D') {
           clients[index_klienta].data.plansza[x][y] = 'X';
+          wygrana = 1;
+          for (int i = 0; i < 10; i++) {
+            for (int j = 0; j < 10; j++) {
+              if (clients[index_klienta].data.plansza[i][j] == 'A' ||
+                  clients[index_klienta].data.plansza[i][j] == 'B' ||
+                  clients[index_klienta].data.plansza[i][j] == 'C' ||
+                  clients[index_klienta].data.plansza[i][j] == 'D') {
+                wygrana = 0;
+              }
+            }
+          }
+          if (wygrana) {
+            for (int k = 0; k < 2; k++) {
+              clients[1 - index_klienta].data.komenda = KONIECGRY;
+              send(clients[k].socket, &(clients[1 - index_klienta].data),
+                   sizeof(clients[1 - index_klienta].data), 0);
+            }
+          }
         } else {
           clients[index_klienta].data.plansza[x][y] = 'o';
         }

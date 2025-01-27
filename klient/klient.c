@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -78,6 +79,10 @@ void *receiveMessages(void *socket) {
       Rysowanieplanszy();
       ready_for_command = 1;
       break;
+    case KONIECGRY:
+      Rysowanieplanszy();
+      printf("ZWYCIESCA: %s", odserwera->username);
+      exit(0);
     default:
       printf("niznanakomenda %d\n", odserwera->komenda);
       break;
@@ -133,12 +138,12 @@ int main() {
     char message[1024];
     // printf("%d\n", ready_for_command);
     if (ready_for_command == 1) {
-      while (1) {
+      /*while (1) {
         int c = getc(stdin);
         if (c == EOF) {
           break;
         }
-      }
+      }*/
       printf("Enter message enter shot: ");
       fgets(message, sizeof(message), stdin);
       if (message[0] >= 'a' && message[0] <= 'j' && message[1] >= '0' &&
