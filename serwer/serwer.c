@@ -119,6 +119,12 @@ void handleClient(int clientSocket) {
         clients[i].data.komenda = PLANSZA;
         send(clients[i].socket, &(clients[i].data), sizeof(clients[i].data), 0);
       }
+      if (clientCount == 2) {
+        clients[index_klienta].data.komenda = DAJSTRZAL;
+        send(clients[index_klienta].socket, &(clients[index_klienta].data),
+             sizeof(clients[index_klienta].data), 0);
+      }
+
       pthread_mutex_unlock(&clientsMutex);
 
       break;
@@ -131,13 +137,26 @@ void handleClient(int clientSocket) {
                daneodklienta.id, index_klienta);
         char x = daneodklienta.x;
         char y = daneodklienta.y;
-        clients[index_klienta].data.plansza[x][y] = 'X';
+        if (clients[index_klienta].data.plansza[x][y] == 'A' ||
+            clients[index_klienta].data.plansza[x][y] == 'B' ||
+            clients[index_klienta].data.plansza[x][y] == 'C' ||
+            clients[index_klienta].data.plansza[x][y] == 'D') {
+          clients[index_klienta].data.plansza[x][y] = 'X';
+        } else {
+          clients[index_klienta].data.plansza[x][y] = 'o';
+        }
         clients[index_klienta].data.komenda = PLANSZA;
 
         for (int i = 0; i < 2; i++) {
-          send(clients[i].socket, &(clients[index_klienta].data),
-               sizeof(clients[index_klienta].data), 0);
+          printf("send1 %d, %d\n", clients[index_klienta].data.komenda,
+                 (int)send(clients[i].socket, &(clients[index_klienta].data),
+                           sizeof(clients[index_klienta].data), 0));
         }
+        clients[index_klienta].data.komenda = DAJSTRZAL;
+        printf("send2 %d, %d\n", clients[index_klienta].data.komenda,
+               (int)send(clients[index_klienta].socket,
+                         &(clients[index_klienta].data),
+                         sizeof(clients[index_klienta].data), 0));
       }
       printf("nowy index id: %d(%d)\n", clients[index_klienta].data.id,
              index_klienta);

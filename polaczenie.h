@@ -4,7 +4,8 @@ enum
     PRZEDSTAWIENIE=1,
     ZAPROSZENIE,
     STRZAL,
-    PLANSZA
+    PLANSZA,
+    DAJSTRZAL
 }KOMNEDY;
 
  typedef struct 
