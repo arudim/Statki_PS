@@ -11,10 +11,11 @@
 
 #define PORT 8080
 
-Client clients[100];
+Client clients[2];
 ClientData daneodklienta;
 int clientCount = 0;
 int index_klienta = 0;
+int max_id = 0;
 
 int wygrana = 1;
 
@@ -56,7 +57,7 @@ void place_ship(char board[10][10], int x, int y, int size, char orientation,
 void set_board(char board[10][10]) {
   char ships[4] = {'A', 'B', 'C', 'D'};
   int sizes[4] = {4, 3, 2, 1};
-  int counts[4] = {0, 0, 0, 1};
+  int counts[4] = {1, 2, 3, 4};
   int x, y, size, ship_index;
   char orientation;
 
@@ -96,8 +97,13 @@ void handleClient(int clientSocket) {
     printf("odebrano :(%d)%d\n", (int)sizeof(daneodklienta), bytesReceived);
     memcpy(&daneodklienta, &buffer, sizeof(daneodklienta));
 
-    printf("daneodklienta.komenda=%d\n:", daneodklienta.komenda);
-
+    printf("daneodklienta.komenda=%d\n", daneodklienta.komenda);
+    for (int i = 0; i < 2; i++) {
+      if (clients[i].data.id >= max_id) {
+        max_id = clients[i].data.id;
+      }
+      printf("klient %s id %d\n", clients[i].data.username, clients[i].data.id);
+    }
     switch (daneodklienta.komenda) {
     case PRZEDSTAWIENIE:
       printf("Klient: %s\n", daneodklienta.username);
@@ -107,7 +113,7 @@ void handleClient(int clientSocket) {
       clients[clientCount].socket = clientSocket;
       memcpy(&(clients[clientCount].data), &daneodklienta,
              sizeof(daneodklienta));
-      clients[clientCount].data.id = clientCount + 1;
+      clients[clientCount].data.id = max_id + 1;
       set_board(clients[clientCount].data.plansza);
       clients[clientCount].data.komenda = ZAPROSZENIE;
       send(clients[clientCount].socket, &(clients[clientCount].data),
@@ -182,14 +188,6 @@ void handleClient(int clientSocket) {
       printf("Nieznane polecenie: %d\n", daneodklienta.komenda);
       break;
     }
-
-    // Broadcast message to all clients, including the sender
-    /*       pthread_mutex_lock(&clientsMutex);
-           for (int i = 0; i < clientCount; i++) {
-               send(clients[i].socket, buffer, bytesReceived, 0);
-           }
-           pthread_mutex_unlock(&clientsMutex);
-           */
   }
 
   // Remove client from list
@@ -242,7 +240,6 @@ int main() {
     pthread_detach(thread);
   }
 
-  // Closing the socket (will never reach here in this example)
   close(serverSocket);
 
   return 0;
