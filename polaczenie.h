@@ -1,24 +1,23 @@
 
 enum
-{
-    PRZEDSTAWIENIE=1,
-    ZAPROSZENIE,
-    STRZAL,
-    PLANSZA,
-    DAJSTRZAL,
-    KONIECGRY
-}KOMNEDY;
+{   
+    CONECTIONLOST=0,
+    INTRODUCTION,
+    INVITE,
+    SHOT,
+    BOARD,
+    GIVESHOT,
+    GAMEOVER
+}COMANDS;
 
  typedef struct 
  {
-    unsigned char komenda;
+    unsigned char comand;
     char username[50];
     unsigned char id;
-    char plansza[10][10];
+    char board[10][10];
     char x;
     char y;
-    char trafienie;
-
  }ClientData;
 
 typedef struct {

@@ -9,26 +9,30 @@
 #include <unistd.h>
 
 #define PORT 8080
-ClientData dane;
-ClientData przeciwnik;
+//Inicjalizaja struktur i zmiennej
+ClientData _data;
+ClientData enemy;
 int ready_for_command = 0;
 
+/*Funkcja rysujaca plansze 
+funkcja czysci terminal nastepnie rysuje plansze gracza ze statkami i oddanymi w nia strzalami
+oraz plansze przeciwnika z uktytymi statkami*/
 void Rysowanieplanszy() {
   printf("\033[H\033[J");
   for (int y = 0; y < 10; y++) {
     for (int x = 0; x < 10; x++) {
-      switch (dane.plansza[x][y]) {
+      switch (_data.board[x][y]) {
       case 0:
         printf(".");
         break;
       default:
-        printf("%c", dane.plansza[x][y]);
+        printf("%c", _data.board[x][y]);
         break;
       }
     }
     printf("  ");
     for (int x = 0; x < 10; x++) {
-      switch (przeciwnik.plansza[x][y]) {
+      switch (enemy.board[x][y]) {
       case 0:
       case 'A':
       case 'B':
@@ -37,54 +41,61 @@ void Rysowanieplanszy() {
         printf(".");
         break;
       default:
-        printf("%c", przeciwnik.plansza[x][y]);
+        printf("%c", enemy.board[x][y]);
         break;
       }
     }
     printf("\n");
   }
 }
-
+/*Obsluga wiadomosci od serwera*/
 void *receiveMessages(void *socket) {
   int clientSocket = *(int *)socket;
   char buffer[1024];
-  ClientData *odserwera;
+  ClientData *from_server;
   while (1) {
     memset(buffer, 0, sizeof(buffer));
     int bytesReceived = recv(clientSocket, buffer, sizeof(buffer), 0);
     /*if (bytesReceived > 0) {
       printf("Message from server: %s\n", buffer);
     }*/
-    odserwera = (ClientData *)buffer;
-    switch (odserwera->komenda) {
-    case ZAPROSZENIE:
-      memcpy(&dane, buffer, sizeof(dane));
-      printf("Serwer przyjal: %s(%d)\n", dane.username, dane.id);
-
+    from_server = (ClientData *)buffer;
+    /*Switch case obslugujacy widomosci od serwera
+    pierwszym bajtem w strukturze jest flaga obslugiwana przez klienta*/
+    switch (from_server->comand) {
+    case INVITE:
+      memcpy(&_data, buffer, sizeof(_data));
+      printf("Serwer przyjal: %s(%d)\n", _data.username, _data.id);
       Rysowanieplanszy();
       break;
-    case PLANSZA:
-      // printf("ja:%d,przyszedl %d\n", dane.id, odserwera->id);
-      if (dane.id == odserwera->id) {
+    case BOARD:
+      // printf("ja:%d,przyszedl %d\n", _data.id, from_server->id);
+      if (_data.id == from_server->id) {
         // printf("mojamapa\n");
-        memcpy(&(dane.plansza), odserwera->plansza, sizeof(dane.plansza));
+        memcpy(&(_data.board), from_server->board, sizeof(_data.board));
       } else {
         printf("mapaprzeciwinika\n");
-        memcpy(&(przeciwnik.plansza), odserwera->plansza,
-               sizeof(przeciwnik.plansza));
+        memcpy(&(enemy.board), from_server->board,
+               sizeof(enemy.board));
       }
       Rysowanieplanszy();
       break;
-    case DAJSTRZAL:
+    case GIVESHOT:
       Rysowanieplanszy();
       ready_for_command = 1;
       break;
-    case KONIECGRY:
+    case GAMEOVER:
       Rysowanieplanszy();
-      printf("ZWYCIESCA: %s", odserwera->username);
+      printf("ZWYCIESCA: %s", from_server->username);
       exit(0);
+    break;
+    case CONECTIONLOST:
+    printf("Utrata polaczenia z serweram");
+    close(clientSocket);
+    exit(0);
+    break;
     default:
-      printf("niznanakomenda %d\n", odserwera->komenda);
+      printf("niznanakomenda %d\n", from_server->comand);
       break;
     }
   }
@@ -93,69 +104,63 @@ void *receiveMessages(void *socket) {
 void handleSigpipe(int signal) { printf("Caught SIGPIPE signal!\n"); }
 
 int main() {
-  // Set up SIGPIPE handler
+  // Ustawienie hendlera SIGPIPE
   signal(SIGPIPE, handleSigpipe);
 
-  // Creating socket
+  // Tworzenie socketu
   int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
 
-  // Specifying address
+  // Specyfikacja adresacji klienta
   struct sockaddr_in serverAddress;
   serverAddress.sin_family = AF_INET;
   serverAddress.sin_port = htons(PORT);
   serverAddress.sin_addr.s_addr =
-      inet_addr("10.2.10.1"); // Use the correct server IP address
+      inet_addr("10.2.10.1"); // Staly addres IP serwera
 
-  // Sending connection request
+  // Wyslanie prozby o polaczenie
   if (connect(clientSocket, (struct sockaddr *)&serverAddress,
               sizeof(serverAddress)) < 0) {
     perror("Connection failed");
     return 1;
   }
 
-  // Send introduction message (username)
+  // Wysanie wiadomosci do klienta zprozba o przedstawienie
   char username[50];
-  printf("Enter your username: ");
-  fgets(dane.username, (int)sizeof(dane.username), stdin);
-  username[strcspn(dane.username, "\n")] = '\0'; // Remove newline character
-  dane.komenda = PRZEDSTAWIENIE;
-  printf("dane.komenda=%d\n:", dane.komenda);
+  printf("Wprowadz swoja nazwe uzytkownika: ");
+  fgets(_data.username, (int)sizeof(_data.username), stdin);
+  username[strcspn(_data.username, "\n")] = '\0'; // Remove newline character
+  _data.comand = INTRODUCTION;
+  printf("_data.comand=%d\n:", _data.comand);
 
-  /*for (int i = 0; i < sizeof(dane); i++)
-    printf("%c(%d),", ((char *)&dane)[i], ((char *)&dane)[i]);
+  /*for (int i = 0; i < sizeof(_data); i++)
+    printf("%c(%d),", ((char *)&_data)[i], ((char *)&_data)[i]);
   printf("\n\n");*/
 
-  int wyslane = send(clientSocket, (char *)&dane, sizeof(dane), 0);
-  printf("wyslane:(%d) %d\n", (int)sizeof(dane), wyslane);
+  int wyslane = send(clientSocket, (char *)&_data, sizeof(_data), 0);
+  printf("wyslane:(%d) %d\n", (int)sizeof(_data), wyslane);
 
-  // Start thread to receive messages
+  // Rozpoczecie nowego wadku do przechwytywania wiadomosci
   pthread_t thread;
   pthread_create(&thread, NULL, receiveMessages, &clientSocket);
   pthread_detach(thread);
 
-  // Communication loop
+  // Glowna petla
   while (1) {
     char message[1024];
     // printf("%d\n", ready_for_command);
     if (ready_for_command == 1) {
-      /*while (1) {
-        int c = getc(stdin);
-        if (c == EOF) {
-          break;
-        }
-      }*/
-      printf("Enter message enter shot: ");
+      printf("Wprowadz miejsce strzalu: ");
       fgets(message, sizeof(message), stdin);
       if (message[0] >= 'a' && message[0] <= 'j' && message[1] >= '0' &&
           message[1] <= '9') {
-        message[strcspn(message, "\n")] = '\0'; // Remove newline character
+        message[strcspn(message, "\n")] = '\0'; // Usuniecie znaku nowej lini
         char x = message[0] - 'a';
         char y = message[1] - '0';
-        dane.x = x;
-        dane.y = y;
-        dane.komenda = STRZAL;
+        _data.x = x;
+        _data.y = y;
+        _data.comand = SHOT;
         ready_for_command = 0;
-        send(clientSocket, &dane, sizeof(dane), 0);
+        send(clientSocket, &_data, sizeof(_data), 0);
       } else {
         continue;
       }
@@ -163,7 +168,7 @@ int main() {
     sleep(1);
   }
 
-  // Closing socket (will never reach here in this example)
+  // Zamkniecie socketu Klienta
   close(clientSocket);
 
   return 0;
