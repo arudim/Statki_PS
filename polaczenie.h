@@ -7,7 +7,8 @@ enum
     SHOT,
     BOARD,
     GIVESHOT,
-    GAMEOVER
+    GAMEOVER,
+    TOOMANY
 }COMANDS;
 
  typedef struct 

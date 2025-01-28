@@ -10,9 +10,10 @@
 #include <unistd.h>
 
 #define PORT 8080
-//Maksymalna przewidziana ilosc klientow jest rowna 2
+// Maksymalna przewidziana ilosc klientow jest rowna 2
 Client clients[2];
-//Inicjalizacja zmiennych i struktury
+ClientData dummyClient;
+// Inicjalizacja zmiennych i struktury
 ClientData data_from_client;
 int clientCount = 0;
 int index_klienta = 0;
@@ -63,8 +64,6 @@ void set_board(char board[10][10]) {
   int x, y, size, ship_index;
   char orientation;
 
-  srand(time(0)); // Seed random number generator
-
   for (ship_index = 0; ship_index < 4; ship_index++) {
     size = sizes[ship_index];
     for (int i = 0; i < counts[ship_index]; i++) {
@@ -104,11 +103,13 @@ void handleClient(int clientSocket) {
       if (clients[i].data.id >= max_id) {
         max_id = clients[i].data.id;
       }
-     // printf("klient %s id %d\n", clients[i].data.username, clients[i].data.id);
+      // printf("klient %s id %d\n", clients[i].data.username,
+      // clients[i].data.id);
     }
     /*Switch case obslugujacy flagi w strukturze*/
     switch (data_from_client.comand) {
     case INTRODUCTION:
+      int currentCount = clientCount;
       printf("Klient: %s\n", data_from_client.username);
       memset(&(clients[clientCount].data), 0,
              sizeof(clients[clientCount].data));
@@ -117,20 +118,33 @@ void handleClient(int clientSocket) {
       memcpy(&(clients[clientCount].data), &data_from_client,
              sizeof(data_from_client));
       clients[clientCount].data.id = max_id + 1;
-      set_board(clients[clientCount].data.board);
       clients[clientCount].data.comand = INVITE;
       send(clients[clientCount].socket, &(clients[clientCount].data),
            sizeof(clients[clientCount].data), 0);
+      printf("send %d, k: %d\n", clientCount, clients[clientCount].data.comand);
       clientCount++;
-      for (int i = 0; i < clientCount; i++) {
-        printf("send %d\n", i);
+      if (currentCount != clientCount && clientCount == 2) {
+        for (int i = 0; i < clientCount; i++) {
+          memset(&(clients[i].data.board), 0, sizeof(clients[i].data.board));
+          set_board(clients[i].data.board);
+          clients[i].data.comand = BOARD;
+          send(clients[i].socket, &(clients[i].data), sizeof(clients[i].data),
+               0);
+          printf("send %d, k: %d\n", i, clients[i].data.comand);
+        }
+      }
+      /*for (int i = 0; i < clientCount; i++) {
         clients[i].data.comand = BOARD;
         send(clients[i].socket, &(clients[i].data), sizeof(clients[i].data), 0);
-      }
+        printf("send %d, k: %d\n", i, clients[i].data.comand);
+      }*/
       if (clientCount == 2) {
+        sleep(1);
         clients[index_klienta].data.comand = GIVESHOT;
         send(clients[index_klienta].socket, &(clients[index_klienta].data),
              sizeof(clients[index_klienta].data), 0);
+        printf("send %d, k: %d\n", index_klienta,
+               clients[index_klienta].data.comand);
       }
 
       pthread_mutex_unlock(&clientsMutex);
@@ -199,6 +213,11 @@ void handleClient(int clientSocket) {
     if (clients[i].socket == clientSocket) {
       clients[i] = clients[clientCount - 1];
       clientCount--;
+      for (int i = 0; i < clientCount; i++) {
+        clients[i].data.comand = GAMEOVER;
+        send(clients[i].socket, &(clients[i].data), sizeof(clients[i].data), 0);
+        printf("send %d, k: %d\n", i, clients[i].data.comand);
+      }
       break;
     }
   }
@@ -211,6 +230,7 @@ void handleSigpipe(int signal) { printf("Caught SIGPIPE signal!\n"); }
 int main() {
   // Ustawienie hendlera SIGPYPE
   signal(SIGPIPE, handleSigpipe);
+  srand(time(0)); // Seed random number generator
 
   // Utworzenie socketu
   int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
@@ -219,8 +239,7 @@ int main() {
   struct sockaddr_in serverAddress;
   serverAddress.sin_family = AF_INET;
   serverAddress.sin_port = htons(PORT);
-  serverAddress.sin_addr.s_addr =
-      inet_addr("10.2.10.1"); // Statyczny adress IP
+  serverAddress.sin_addr.s_addr = inet_addr("10.2.10.1"); // Statyczny adress IP
 
   // Bindowanie socketu serwera
   bind(serverSocket, (struct sockaddr *)&serverAddress, sizeof(serverAddress));
@@ -233,9 +252,14 @@ int main() {
   while (1) {
     // Akceptowanie paczen
     int clientSocket = accept(serverSocket, NULL, NULL);
+    // Zamykanie pałaczenia dla większej liczny graczy niż 2
     if (clientCount > 1) {
+      printf("Juz jest 2 graczy\n");
+      dummyClient.comand = TOOMANY;
+      send(clientSocket, &(dummyClient), sizeof(dummyClient), 0);
       close(clientSocket);
     }
+
     // Obsluga klientow w wadkach
     pthread_t thread;
     pthread_create(&thread, NULL, (void *)handleClient,

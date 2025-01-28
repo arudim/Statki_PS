@@ -9,17 +9,28 @@
 #include <unistd.h>
 
 #define PORT 8080
-//Inicjalizaja struktur i zmiennej
+// Inicjalizaja struktur i zmiennej
 ClientData _data;
 ClientData enemy;
 int ready_for_command = 0;
 
-/*Funkcja rysujaca plansze 
-funkcja czysci terminal nastepnie rysuje plansze gracza ze statkami i oddanymi w nia strzalami
-oraz plansze przeciwnika z uktytymi statkami*/
+/*Funkcja rysujaca plansze
+funkcja czysci terminal nastepnie rysuje plansze gracza ze statkami i oddanymi w
+nia strzalami oraz plansze przeciwnika z uktytymi statkami*/
 void Rysowanieplanszy() {
   printf("\033[H\033[J");
+  printf("   ");
+  for (char c = 'a'; c <= 'j'; c++) {
+    printf("%c", c);
+  }
+  printf("     ");
+  for (char c = 'a'; c <= 'j'; c++) {
+    printf("%c", c);
+  }
+  printf("\n");
+
   for (int y = 0; y < 10; y++) {
+    printf("%2d ", y);
     for (int x = 0; x < 10; x++) {
       switch (_data.board[x][y]) {
       case 0:
@@ -30,7 +41,8 @@ void Rysowanieplanszy() {
         break;
       }
     }
-    printf("  ");
+
+    printf("  %2d ", y);
     for (int x = 0; x < 10; x++) {
       switch (enemy.board[x][y]) {
       case 0:
@@ -48,6 +60,7 @@ void Rysowanieplanszy() {
     printf("\n");
   }
 }
+
 /*Obsluga wiadomosci od serwera*/
 void *receiveMessages(void *socket) {
   int clientSocket = *(int *)socket;
@@ -75,25 +88,29 @@ void *receiveMessages(void *socket) {
         memcpy(&(_data.board), from_server->board, sizeof(_data.board));
       } else {
         printf("mapaprzeciwinika\n");
-        memcpy(&(enemy.board), from_server->board,
-               sizeof(enemy.board));
+        memcpy(&(enemy.board), from_server->board, sizeof(enemy.board));
       }
       Rysowanieplanszy();
       break;
     case GIVESHOT:
       Rysowanieplanszy();
+      printf("flaga 5\n");
       ready_for_command = 1;
       break;
     case GAMEOVER:
       Rysowanieplanszy();
       printf("ZWYCIESCA: %s", from_server->username);
-      exit(0);
-    break;
+      // exit(0);
+      break;
     case CONECTIONLOST:
-    printf("Utrata polaczenia z serweram");
-    close(clientSocket);
-    exit(0);
-    break;
+      printf("Utrata polaczenia z serweram");
+      close(clientSocket);
+      exit(0);
+      break;
+    case TOOMANY:
+      printf("Już jest 2 graczy");
+      close(clientSocket);
+      exit(0);
     default:
       printf("niznanakomenda %d\n", from_server->comand);
       break;
