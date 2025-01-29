@@ -60,7 +60,7 @@ void place_ship(char board[10][10], int x, int y, int size, char orientation,
 void set_board(char board[10][10]) {
   char ships[4] = {'A', 'B', 'C', 'D'};
   int sizes[4] = {4, 3, 2, 1};
-  int counts[4] = {1, 2, 3, 4};
+  int counts[4] = {0, 0, 0, 2};
   int x, y, size, ship_index;
   char orientation;
 
@@ -162,44 +162,50 @@ void handleClient(int clientSocket) {
         if (clients[index_klienta].data.board[x][y] == 'A' ||
             clients[index_klienta].data.board[x][y] == 'B' ||
             clients[index_klienta].data.board[x][y] == 'C' ||
-            clients[index_klienta].data.board[x][y] == 'D') {
+            clients[index_klienta].data.board[x][y] == 'D' ||
+            clients[index_klienta].data.board[x][y] == 'X') {
           clients[index_klienta].data.board[x][y] = 'X';
           wygrana = 1;
-          for (int i = 0; i < 10; i++) {
-            for (int j = 0; j < 10; j++) {
-              if (clients[index_klienta].data.board[i][j] == 'A' ||
-                  clients[index_klienta].data.board[i][j] == 'B' ||
-                  clients[index_klienta].data.board[i][j] == 'C' ||
-                  clients[index_klienta].data.board[i][j] == 'D') {
-                wygrana = 0;
-              }
-            }
-          }
-          if (wygrana) {
-            for (int k = 0; k < 2; k++) {
-              clients[1 - index_klienta].data.comand = GAMEOVER;
-              send(clients[k].socket, &(clients[1 - index_klienta].data),
-                   sizeof(clients[1 - index_klienta].data), 0);
-            }
-          }
         } else {
           clients[index_klienta].data.board[x][y] = 'o';
         }
-        clients[index_klienta].data.comand = BOARD;
+        for (int i = 0; i < 10; i++) {
+          for (int j = 0; j < 10; j++) {
+            if (clients[index_klienta].data.board[i][j] == 'A' ||
+                clients[index_klienta].data.board[i][j] == 'B' ||
+                clients[index_klienta].data.board[i][j] == 'C' ||
+                clients[index_klienta].data.board[i][j] == 'D') {
+              wygrana = 0;
+            }
+          }
+        }
+        if (wygrana) {
+          for (int k = 0; k < 2; k++) {
+            clients[1 - index_klienta].data.comand = GAMEOVER;
+            printf("send1 %d, %d\n", clients[index_klienta].data.comand,
+                   (int)send(clients[k].socket,
+                             &(clients[1 - index_klienta].data),
+                             sizeof(clients[1 - index_klienta].data), 0));
+          }
 
-        for (int i = 0; i < 2; i++) {
-          printf("send1 %d, %d\n", clients[index_klienta].data.comand,
-                 (int)send(clients[i].socket, &(clients[index_klienta].data),
+        } else {
+          clients[index_klienta].data.comand = BOARD;
+
+          for (int i = 0; i < 2; i++) {
+            printf("send1 %d, %d\n", clients[index_klienta].data.comand,
+                   (int)send(clients[i].socket, &(clients[index_klienta].data),
+                             sizeof(clients[index_klienta].data), 0));
+          }
+          clients[index_klienta].data.comand = GIVESHOT;
+          printf("send2 %d, %d\n", clients[index_klienta].data.comand,
+                 (int)send(clients[index_klienta].socket,
+                           &(clients[index_klienta].data),
                            sizeof(clients[index_klienta].data), 0));
         }
-        clients[index_klienta].data.comand = GIVESHOT;
-        printf("send2 %d, %d\n", clients[index_klienta].data.comand,
-               (int)send(clients[index_klienta].socket,
-                         &(clients[index_klienta].data),
-                         sizeof(clients[index_klienta].data), 0));
       }
       printf("nowy index id: %d(%d)\n", clients[index_klienta].data.id,
              index_klienta);
+
       break;
     default:
       printf("Nieznane polecenie: %d\n", data_from_client.comand);

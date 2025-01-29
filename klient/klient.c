@@ -100,12 +100,13 @@ void *receiveMessages(void *socket) {
     case GAMEOVER:
       Rysowanieplanszy();
       printf("ZWYCIESCA: %s", from_server->username);
-      // exit(0);
-      break;
-    case CONECTIONLOST:
-      printf("Utrata polaczenia z serweram");
       close(clientSocket);
       exit(0);
+      break;
+    case CONECTIONLOST:
+      printf("Utrata polaczenia z serweram\n");
+      close(clientSocket);
+      exit(-1);
       break;
     case TOOMANY:
       printf("Już jest 2 graczy");
