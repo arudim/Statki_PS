@@ -24,8 +24,7 @@ int wygrana = 1;
 pthread_mutex_t clientsMutex = PTHREAD_MUTEX_INITIALIZER;
 
 /*Zestaw trzech funkcji generujacych losowo plansze z ustaiwniem statkow*/
-int is_valid_position(char board[10][10], int x, int y, int size,
-                      char orientation) {
+int is_valid_position(char board[10][10], int x, int y, int size, char orientation) {
   if (orientation == 'h') { // horizontal
     if (y + size > 10)
       return 0; // out of bounds
@@ -44,8 +43,7 @@ int is_valid_position(char board[10][10], int x, int y, int size,
   return 1; // valid position
 }
 
-void place_ship(char board[10][10], int x, int y, int size, char orientation,
-                char ship_char) {
+void place_ship(char board[10][10], int x, int y, int size, char orientation, char ship_char) {
   if (orientation == 'h') { // horizontal
     for (int i = y; i < y + size; i++) {
       board[x][i] = ship_char;
@@ -60,7 +58,7 @@ void place_ship(char board[10][10], int x, int y, int size, char orientation,
 void set_board(char board[10][10]) {
   char ships[4] = {'A', 'B', 'C', 'D'};
   int sizes[4] = {4, 3, 2, 1};
-  int counts[4] = {0, 0, 0, 2};
+  int counts[4] = {1, 2, 3, 4};
   int x, y, size, ship_index;
   char orientation;
 
@@ -77,9 +75,7 @@ void set_board(char board[10][10]) {
           place_ship(board, x, y, size, orientation, ships[ship_index]);
           printf("umieszczony:%c\n", ships[ship_index]);
           placed = 1;
-        } /* else {
-           printf("not valid %d %d\n", x, y);
-         }*/
+        }
       }
     }
   }
@@ -103,24 +99,25 @@ void handleClient(int clientSocket) {
       if (clients[i].data.id >= max_id) {
         max_id = clients[i].data.id;
       }
-      // printf("klient %s id %d\n", clients[i].data.username,
-      // clients[i].data.id);
     }
-    /*Switch case obslugujacy flagi w strukturze*/
+    /*Switch case obslugujacy flagi w strukturze.
+    Serwer sprawdza typ flaig jaką otrzymał*/
     switch (data_from_client.comand) {
+      /*Flaga INTRODUCTION nadaje klientowi dane id nastepnie ktore mu przesyła,
+      następnie sprawdza czy połączyło się dwóch klientów jeżeli tak serwer generuje im plansze które są przesyłąne do klientów
+      z flagą BOARD do ich wyrysowania. Następnie wysyłąna jest komęda do pierwszego klinanta GIVESHOT.*/
     case INTRODUCTION:
       int currentCount = clientCount;
+      // Log serwera
       printf("Klient: %s\n", data_from_client.username);
-      memset(&(clients[clientCount].data), 0,
-             sizeof(clients[clientCount].data));
+      memset(&(clients[clientCount].data), 0, sizeof(clients[clientCount].data));
       pthread_mutex_lock(&clientsMutex);
       clients[clientCount].socket = clientSocket;
-      memcpy(&(clients[clientCount].data), &data_from_client,
-             sizeof(data_from_client));
+      memcpy(&(clients[clientCount].data), &data_from_client, sizeof(data_from_client));
       clients[clientCount].data.id = max_id + 1;
       clients[clientCount].data.comand = INVITE;
-      send(clients[clientCount].socket, &(clients[clientCount].data),
-           sizeof(clients[clientCount].data), 0);
+      send(clients[clientCount].socket, &(clients[clientCount].data), sizeof(clients[clientCount].data), 0);
+      // Log serwera
       printf("send %d, k: %d\n", clientCount, clients[clientCount].data.comand);
       clientCount++;
       if (currentCount != clientCount && clientCount == 2) {
@@ -128,35 +125,31 @@ void handleClient(int clientSocket) {
           memset(&(clients[i].data.board), 0, sizeof(clients[i].data.board));
           set_board(clients[i].data.board);
           clients[i].data.comand = BOARD;
-          send(clients[i].socket, &(clients[i].data), sizeof(clients[i].data),
-               0);
+          send(clients[i].socket, &(clients[i].data), sizeof(clients[i].data), 0);
           printf("send %d, k: %d\n", i, clients[i].data.comand);
         }
       }
-      /*for (int i = 0; i < clientCount; i++) {
-        clients[i].data.comand = BOARD;
-        send(clients[i].socket, &(clients[i].data), sizeof(clients[i].data), 0);
-        printf("send %d, k: %d\n", i, clients[i].data.comand);
-      }*/
       if (clientCount == 2) {
         sleep(1);
         clients[index_klienta].data.comand = GIVESHOT;
-        send(clients[index_klienta].socket, &(clients[index_klienta].data),
-             sizeof(clients[index_klienta].data), 0);
-        printf("send %d, k: %d\n", index_klienta,
-               clients[index_klienta].data.comand);
+        send(clients[index_klienta].socket, &(clients[index_klienta].data), sizeof(clients[index_klienta].data), 0);
+        printf("send %d, k: %d\n", index_klienta, clients[index_klienta].data.comand);
       }
 
       pthread_mutex_unlock(&clientsMutex);
 
       break;
+      /*W przypadku flagi SHOT serwer sprawdza czy miejsce w którym oddano sprzał znajduje się statek jeżeli tak
+      wysuje tam 'X' w przeciwnym wypadku 'o'. Następnie sprawdzany jest stan gry czy któryś z graczy zwyciężył
+      jeżeli tak wysyłana jest struktura z flagą GAMEOVER kończąca grę, jeżeli gra nadal trwa ferwer odsyła strukturę
+      z flagą BOARD do obu klientów oraz struktura z flagoa GIVESHOT do następnego gracza z kolei*/
     case SHOT:
-      printf("\n\nindex id: %d(%d), kto %d\n", clients[index_klienta].data.id,
-             index_klienta, data_from_client.id);
+      // Log serwera
+      printf("\n\nindex id: %d(%d), kto %d\n", clients[index_klienta].data.id, index_klienta, data_from_client.id);
       if (clients[index_klienta].data.id == data_from_client.id) {
         index_klienta = 1 - index_klienta;
-        printf("Strzal Klient: %s.%d(%d)\n", data_from_client.username,
-               data_from_client.id, index_klienta);
+        // Log serwera
+        printf("Strzal Klient: %s.%d(%d)\n", data_from_client.username, data_from_client.id, index_klienta);
         char x = data_from_client.x;
         char y = data_from_client.y;
         if (clients[index_klienta].data.board[x][y] == 'A' ||
@@ -182,38 +175,32 @@ void handleClient(int clientSocket) {
         if (wygrana) {
           for (int k = 0; k < 2; k++) {
             clients[1 - index_klienta].data.comand = GAMEOVER;
-            printf("send1 %d, %d\n", clients[index_klienta].data.comand,
-                   (int)send(clients[k].socket,
-                             &(clients[1 - index_klienta].data),
-                             sizeof(clients[1 - index_klienta].data), 0));
+            printf("send1 %d, %d\n", clients[index_klienta].data.comand, (int)send(clients[k].socket, &(clients[1 - index_klienta].data), sizeof(clients[1 - index_klienta].data), 0));
           }
 
         } else {
           clients[index_klienta].data.comand = BOARD;
 
           for (int i = 0; i < 2; i++) {
-            printf("send1 %d, %d\n", clients[index_klienta].data.comand,
-                   (int)send(clients[i].socket, &(clients[index_klienta].data),
-                             sizeof(clients[index_klienta].data), 0));
+            printf("send1 %d, %d\n", clients[index_klienta].data.comand, (int)send(clients[i].socket, &(clients[index_klienta].data), sizeof(clients[index_klienta].data), 0));
           }
           clients[index_klienta].data.comand = GIVESHOT;
-          printf("send2 %d, %d\n", clients[index_klienta].data.comand,
-                 (int)send(clients[index_klienta].socket,
-                           &(clients[index_klienta].data),
-                           sizeof(clients[index_klienta].data), 0));
+          printf("send2 %d, %d\n", clients[index_klienta].data.comand, (int)send(clients[index_klienta].socket, &(clients[index_klienta].data), sizeof(clients[index_klienta].data), 0));
         }
       }
-      printf("nowy index id: %d(%d)\n", clients[index_klienta].data.id,
-             index_klienta);
+      // Log serwera
+      printf("nowy index id: %d(%d)\n", clients[index_klienta].data.id, index_klienta);
 
       break;
     default:
+      // Log serwera
       printf("Nieznane polecenie: %d\n", data_from_client.comand);
       break;
     }
   }
 
-  // Usuniecie klienta z vektora
+  /*Usuniecie klienta z vektora, oraz w przypadku przedwczesnego zakończenia gry zostaje wysłana wiadomość
+  GAMEOVER do wygranego gracza*/
   pthread_mutex_lock(&clientsMutex);
   for (int i = 0; i < clientCount; i++) {
     if (clients[i].socket == clientSocket) {
@@ -252,13 +239,13 @@ int main() {
 
   // Ustawienie nasuchiwania serwera na porcie
   listen(serverSocket, 5);
-
+  // Log serwera
   printf("Server is listening on port %d...\n", PORT);
 
   while (1) {
     // Akceptowanie paczen
     int clientSocket = accept(serverSocket, NULL, NULL);
-    // Zamykanie pałaczenia dla większej liczny graczy niż 2
+    // Zamykanie pałaczenia dla nadprogramowych graczy
     if (clientCount > 1) {
       printf("Juz jest 2 graczy\n");
       dummyClient.comand = TOOMANY;
@@ -266,10 +253,9 @@ int main() {
       close(clientSocket);
     }
 
-    // Obsluga klientow w wadkach
+    // Obsluga klientow w nowym wądku
     pthread_t thread;
-    pthread_create(&thread, NULL, (void *)handleClient,
-                   (void *)(intptr_t)clientSocket);
+    pthread_create(&thread, NULL, (void *)handleClient, (void *)(intptr_t)clientSocket);
     pthread_detach(thread);
   }
 

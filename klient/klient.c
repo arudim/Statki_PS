@@ -10,7 +10,7 @@
 
 #define PORT 8080
 // Inicjalizaja struktur i zmiennej
-ClientData _data;
+ClientData client_data;
 ClientData enemy;
 int ready_for_command = 0;
 
@@ -32,12 +32,12 @@ void Rysowanieplanszy() {
   for (int y = 0; y < 10; y++) {
     printf("%2d ", y);
     for (int x = 0; x < 10; x++) {
-      switch (_data.board[x][y]) {
+      switch (client_data.board[x][y]) {
       case 0:
         printf(".");
         break;
       default:
-        printf("%c", _data.board[x][y]);
+        printf("%c", client_data.board[x][y]);
         break;
       }
     }
@@ -76,16 +76,17 @@ void *receiveMessages(void *socket) {
     /*Switch case obslugujacy widomosci od serwera
     pierwszym bajtem w strukturze jest flaga obslugiwana przez klienta*/
     switch (from_server->comand) {
+      /**/
     case INVITE:
-      memcpy(&_data, buffer, sizeof(_data));
-      printf("Serwer przyjal: %s(%d)\n", _data.username, _data.id);
+      memcpy(&client_data, buffer, sizeof(client_data));
       Rysowanieplanszy();
+      printf("Serwer przyjal: %sOczekiwanie na drugoego gracza.\n", client_data.username);
       break;
     case BOARD:
-      // printf("ja:%d,przyszedl %d\n", _data.id, from_server->id);
-      if (_data.id == from_server->id) {
+      // printf("ja:%d,przyszedl %d\n", client_data.id, from_server->id);
+      if (client_data.id == from_server->id) {
         // printf("mojamapa\n");
-        memcpy(&(_data.board), from_server->board, sizeof(_data.board));
+        memcpy(&(client_data.board), from_server->board, sizeof(client_data.board));
       } else {
         printf("mapaprzeciwinika\n");
         memcpy(&(enemy.board), from_server->board, sizeof(enemy.board));
@@ -94,7 +95,8 @@ void *receiveMessages(void *socket) {
       break;
     case GIVESHOT:
       Rysowanieplanszy();
-      printf("flaga 5\n");
+      //debugowanie
+      //printf("flaga 5\n");
       ready_for_command = 1;
       break;
     case GAMEOVER:
@@ -142,20 +144,17 @@ int main() {
     return 1;
   }
 
-  // Wysanie wiadomosci do klienta zprozba o przedstawienie
+  // Wysłąnie wiadomości do serwera z flagą INRODUCTION wraz z nazwa uzytkownika
   char username[50];
   printf("Wprowadz swoja nazwe uzytkownika: ");
-  fgets(_data.username, (int)sizeof(_data.username), stdin);
-  username[strcspn(_data.username, "\n")] = '\0'; // Remove newline character
-  _data.comand = INTRODUCTION;
-  printf("_data.comand=%d\n:", _data.comand);
-
-  /*for (int i = 0; i < sizeof(_data); i++)
-    printf("%c(%d),", ((char *)&_data)[i], ((char *)&_data)[i]);
-  printf("\n\n");*/
-
-  int wyslane = send(clientSocket, (char *)&_data, sizeof(_data), 0);
-  printf("wyslane:(%d) %d\n", (int)sizeof(_data), wyslane);
+  fgets(client_data.username, (int)sizeof(client_data.username), stdin);
+  username[strcspn(client_data.username, "\n")] = '\0'; // Remove newline character
+  client_data.comand = INTRODUCTION;
+  // debugowanie kodu
+  //  printf("client_data.comand=%d\n:", client_data.comand);
+  int wyslane = send(clientSocket, (char *)&client_data, sizeof(client_data), 0);
+  // debugowanie kodu
+  //  printf("wyslane:(%d) %d\n", (int)sizeof(client_data), wyslane);
 
   // Rozpoczecie nowego wadku do przechwytywania wiadomosci
   pthread_t thread;
@@ -174,11 +173,11 @@ int main() {
         message[strcspn(message, "\n")] = '\0'; // Usuniecie znaku nowej lini
         char x = message[0] - 'a';
         char y = message[1] - '0';
-        _data.x = x;
-        _data.y = y;
-        _data.comand = SHOT;
+        client_data.x = x;
+        client_data.y = y;
+        client_data.comand = SHOT;
         ready_for_command = 0;
-        send(clientSocket, &_data, sizeof(_data), 0);
+        send(clientSocket, &client_data, sizeof(client_data), 0);
       } else {
         continue;
       }
