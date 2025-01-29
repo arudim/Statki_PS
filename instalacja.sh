@@ -1,5 +1,5 @@
 #!/bin/bash
-gcc server/serwer.c -o serwerstatki
+gcc serwer/serwer.c -o serwerstatki
 gcc klient/klient.c -o graczwstatki
 dstdir=/usr/games #/usr/share/statki
 
