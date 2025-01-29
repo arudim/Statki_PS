@@ -232,7 +232,7 @@ int main() {
   struct sockaddr_in serverAddress;
   serverAddress.sin_family = AF_INET;
   serverAddress.sin_port = htons(PORT);
-  serverAddress.sin_addr.s_addr = inet_addr("10.2.10.1"); // Statyczny adress IP
+  serverAddress.sin_addr.s_addr = inet_addr("0.0.0.0"); // Statyczny adress IP
 
   // Bindowanie socketu serwera
   bind(serverSocket, (struct sockaddr *)&serverAddress, sizeof(serverAddress));

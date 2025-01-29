@@ -1,0 +1,13 @@
+[Unit]
+Description=Gra w statki 10x10
+After=network.target
+DefaultDependencies=no
+
+[Service]
+Type=simple
+ExecStart=/usr/games/serwerstatki 
+TimeoutstartSec=0
+
+
+[Install]
+WantedBy=default.target

@@ -96,8 +96,8 @@ void *receiveMessages(void *socket) {
       /*Flaga GIVESHOT przygotowuej zmienna do wysłanie wiadomości do serwera z strzałęm*/
     case GIVESHOT:
       Rysowanieplanszy();
-      //debugowanie
-      //printf("flaga 5\n");
+      // debugowanie
+      // printf("flaga 5\n");
       ready_for_command = 1;
       break;
       /*Wyświetla wiadomość ze zwycięscą i zamyka socket wraz z programem*/
@@ -127,7 +127,7 @@ void *receiveMessages(void *socket) {
 }
 void handleSigpipe(int signal) { printf("Caught SIGPIPE signal!\n"); }
 
-int main() {
+int main(int argc, char *argv[]) {
   // Ustawienie hendlera SIGPIPE
   signal(SIGPIPE, handleSigpipe);
 
@@ -138,8 +138,9 @@ int main() {
   struct sockaddr_in serverAddress;
   serverAddress.sin_family = AF_INET;
   serverAddress.sin_port = htons(PORT);
+  printf("adress: %s\n", argv[1]);
   serverAddress.sin_addr.s_addr =
-      inet_addr("10.2.10.1"); // Staly addres IP serwera
+      inet_addr(argv[1]); // Staly addres IP serwera
 
   // Wyslanie prozby o polaczenie
   if (connect(clientSocket, (struct sockaddr *)&serverAddress,
