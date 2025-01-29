@@ -76,16 +76,16 @@ void *receiveMessages(void *socket) {
     /*Switch case obslugujacy widomosci od serwera
     pierwszym bajtem w strukturze jest flaga obslugiwana przez klienta*/
     switch (from_server->comand) {
-      /**/
+      /*Jeżeli klient przyjmie strukturę z flagą wyryowuje plansze i wyświetla wiadomość o oczekiwaniu na drugiego gracza*/
     case INVITE:
       memcpy(&client_data, buffer, sizeof(client_data));
       Rysowanieplanszy();
       printf("Serwer przyjal: %sOczekiwanie na drugoego gracza.\n", client_data.username);
       break;
+    /*Jeżeli klient przyjmie strukturę board kopiuje on obie struktury i następnie rysuje obie plansze*/
     case BOARD:
       // printf("ja:%d,przyszedl %d\n", client_data.id, from_server->id);
       if (client_data.id == from_server->id) {
-        // printf("mojamapa\n");
         memcpy(&(client_data.board), from_server->board, sizeof(client_data.board));
       } else {
         printf("mapaprzeciwinika\n");
@@ -93,23 +93,27 @@ void *receiveMessages(void *socket) {
       }
       Rysowanieplanszy();
       break;
+      /*Flaga GIVESHOT przygotowuej zmienna do wysłanie wiadomości do serwera z strzałęm*/
     case GIVESHOT:
       Rysowanieplanszy();
       //debugowanie
       //printf("flaga 5\n");
       ready_for_command = 1;
       break;
+      /*Wyświetla wiadomość ze zwycięscą i zamyka socket wraz z programem*/
     case GAMEOVER:
       Rysowanieplanszy();
       printf("ZWYCIESCA: %s", from_server->username);
       close(clientSocket);
       exit(0);
       break;
+      /*W wypadku utraty połączenia z serweram zamyka socket oraz program*/
     case CONECTIONLOST:
       printf("Utrata polaczenia z serweram\n");
       close(clientSocket);
       exit(-1);
       break;
+      /*W wypadku nadprogramowego połączenia zamyka socket i program*/
     case TOOMANY:
       printf("Już jest 2 graczy");
       close(clientSocket);
@@ -164,7 +168,7 @@ int main() {
   // Glowna petla
   while (1) {
     char message[1024];
-    // printf("%d\n", ready_for_command);
+    /*Jeżeli przyszła glaga GIVESHOT wysyłana jest struktura do serwera z miejscem oddania strzalu */
     if (ready_for_command == 1) {
       printf("Wprowadz miejsce strzalu: ");
       fgets(message, sizeof(message), stdin);
