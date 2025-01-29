@@ -20,6 +20,7 @@ int index_klienta = 0;
 int max_id = 0;
 
 int wygrana = 1;
+int trafienie = 0;
 
 pthread_mutex_t clientsMutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -131,9 +132,9 @@ void handleClient(int clientSocket) {
       }
       if (clientCount == 2) {
         sleep(1);
-        clients[index_klienta].data.comand = GIVESHOT;
-        send(clients[index_klienta].socket, &(clients[index_klienta].data), sizeof(clients[index_klienta].data), 0);
-        printf("send %d, k: %d\n", index_klienta, clients[index_klienta].data.comand);
+        clients[0].data.comand = GIVESHOT;
+        send(clients[0].socket, &(clients[0].data), sizeof(clients[0].data), 0);
+        printf("send %d, k: %d\n", 0, clients[0].data.comand);
       }
 
       pthread_mutex_unlock(&clientsMutex);
@@ -146,6 +147,7 @@ void handleClient(int clientSocket) {
     case SHOT:
       // Log serwera
       printf("\n\nindex id: %d(%d), kto %d\n", clients[index_klienta].data.id, index_klienta, data_from_client.id);
+      trafienie = 0;
       if (clients[index_klienta].data.id == data_from_client.id) {
         index_klienta = 1 - index_klienta;
         // Log serwera
@@ -159,6 +161,7 @@ void handleClient(int clientSocket) {
             clients[index_klienta].data.board[x][y] == 'X') {
           clients[index_klienta].data.board[x][y] = 'X';
           wygrana = 1;
+          trafienie = 1;
         } else {
           clients[index_klienta].data.board[x][y] = 'o';
         }
@@ -175,17 +178,26 @@ void handleClient(int clientSocket) {
         if (wygrana) {
           for (int k = 0; k < 2; k++) {
             clients[1 - index_klienta].data.comand = GAMEOVER;
-            printf("send1 %d, %d\n", clients[index_klienta].data.comand, (int)send(clients[k].socket, &(clients[1 - index_klienta].data), sizeof(clients[1 - index_klienta].data), 0));
+            printf("send %d, %d\n", clients[index_klienta].data.comand, (int)send(clients[k].socket, &(clients[1 - index_klienta].data), sizeof(clients[1 - index_klienta].data), 0));
           }
 
         } else {
-          clients[index_klienta].data.comand = BOARD;
-
+          int plansza = index_klienta;
+          if (trafienie) {
+            /*Po trafieniu przywarcamy klientowi kolejność*/
+            index_klienta = 1 - index_klienta;
+            clients[1 - index_klienta]
+                .data.comand = BOARD;
+          } else {
+            clients[index_klienta]
+                .data.comand = BOARD;
+          }
           for (int i = 0; i < 2; i++) {
-            printf("send1 %d, %d\n", clients[index_klienta].data.comand, (int)send(clients[i].socket, &(clients[index_klienta].data), sizeof(clients[index_klienta].data), 0));
+            clients[i].data.comand = BOARD;
+            printf("send %d, %d\n", clients[plansza].data.comand, (int)send(clients[i].socket, &(clients[plansza].data), sizeof(clients[plansza].data), 0));
           }
           clients[index_klienta].data.comand = GIVESHOT;
-          printf("send2 %d, %d\n", clients[index_klienta].data.comand, (int)send(clients[index_klienta].socket, &(clients[index_klienta].data), sizeof(clients[index_klienta].data), 0));
+          printf("send %d, %d\n", clients[index_klienta].data.comand, (int)send(clients[index_klienta].socket, &(clients[index_klienta].data), sizeof(clients[index_klienta].data), 0));
         }
       }
       // Log serwera
