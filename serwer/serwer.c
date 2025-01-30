@@ -15,14 +15,15 @@ Client clients[2];
 ClientData dummyClient;
 // Inicjalizacja zmiennych i struktury
 ClientData data_from_client;
-int clientCount = 0;
-int index_klienta = 0;
+int clientCount = 0;   // Liczba aktualnie podłączonych klientów
+int index_klienta = 0; // Indeks aktualnego gracza (0 lub 1)
 int max_id = 0;
-
+time_t referencetime;
+int gamestarted = 0;
 int wygrana = 1;
 int trafienie = 0;
 
-pthread_mutex_t clientsMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t clientsMutex = PTHREAD_MUTEX_INITIALIZER; // Mutex dla synchronizacji wątków
 
 /*Zestaw trzech funkcji generujacych losowo plansze z ustaiwniem statkow*/
 int is_valid_position(char board[10][10], int x, int y, int size, char orientation) {
@@ -135,6 +136,8 @@ void handleClient(int clientSocket) {
         clients[0].data.comand = GIVESHOT;
         send(clients[0].socket, &(clients[0].data), sizeof(clients[0].data), 0);
         printf("send %d, k: %d\n", 0, clients[0].data.comand);
+        gamestarted = 1;
+        referencetime = time(NULL);
       }
 
       pthread_mutex_unlock(&clientsMutex);
@@ -145,6 +148,7 @@ void handleClient(int clientSocket) {
       jeżeli tak wysyłana jest struktura z flagą GAMEOVER kończąca grę, jeżeli gra nadal trwa ferwer odsyła strukturę
       z flagą BOARD do obu klientów oraz struktura z flagoa GIVESHOT do następnego gracza z kolei*/
     case SHOT:
+      referencetime = time(NULL);
       // Log serwera
       printf("\n\nindex id: %d(%d), kto %d\n", clients[index_klienta].data.id, index_klienta, data_from_client.id);
       trafienie = 0;
@@ -186,21 +190,19 @@ void handleClient(int clientSocket) {
           if (trafienie) {
             /*Po trafieniu przywarcamy klientowi kolejność*/
             index_klienta = 1 - index_klienta;
-            clients[1 - index_klienta]
-                .data.comand = BOARD;
+            clients[1 - index_klienta].data.comand = BOARD;
           } else {
-            clients[index_klienta]
-                .data.comand = BOARD;
+            clients[index_klienta].data.comand = BOARD;
           }
           for (int i = 0; i < 2; i++) {
             clients[i].data.comand = BOARD;
             printf("send %d, %d\n", clients[plansza].data.comand, (int)send(clients[i].socket, &(clients[plansza].data), sizeof(clients[plansza].data), 0));
           }
-          clients[index_klienta].data.comand = GIVESHOT;
-          printf("send %d, %d\n", clients[index_klienta].data.comand, (int)send(clients[index_klienta].socket, &(clients[index_klienta].data), sizeof(clients[index_klienta].data), 0));
         }
       }
       // Log serwera
+      clients[index_klienta].data.comand = GIVESHOT;
+      printf("send %d, %d\n", clients[index_klienta].data.comand, (int)send(clients[index_klienta].socket, &(clients[index_klienta].data), sizeof(clients[index_klienta].data), 0));
       printf("nowy index id: %d(%d)\n", clients[index_klienta].data.id, index_klienta);
 
       break;
@@ -228,50 +230,103 @@ void handleClient(int clientSocket) {
   }
   pthread_mutex_unlock(&clientsMutex);
   close(clientSocket);
+  gamestarted = 0;
 }
 
 void handleSigpipe(int signal) { printf("Caught SIGPIPE signal!\n"); }
 
+void hadleWaitforshot() {
+  while (1) {
+    if (gamestarted) {
+      double wait = difftime(time(NULL), referencetime);
+      if (wait > 10) {
+        clients[index_klienta].data.comand = GIVESHOT;
+        printf("send %d %d, %d\n", index_klienta, clients[index_klienta].data.comand, (int)send(clients[index_klienta].socket, &(clients[index_klienta].data), sizeof(clients[index_klienta].data), 0));
+        referencetime = time(NULL);
+      }
+      printf("waiting %f\n", wait);
+
+    } else {
+      printf("game not started\n");
+    }
+    sleep(1);
+  }
+}
 int main() {
-  // Ustawienie hendlera SIGPYPE
+  // Ustawienie henlera SIGPIPE
   signal(SIGPIPE, handleSigpipe);
-  srand(time(0)); // Seed random number generator
+  srand(time(0));
 
-  // Utworzenie socketu
+  // Tworzenie socketu serwera
   int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+  if (serverSocket == -1) {
+    perror("Socket creation failed");
+    exit(EXIT_FAILURE);
+  }
 
-  // Specyfikacja adresacji serwera
+  // Dtruktura adresu serwera
   struct sockaddr_in serverAddress;
   serverAddress.sin_family = AF_INET;
   serverAddress.sin_port = htons(PORT);
-  serverAddress.sin_addr.s_addr = inet_addr("0.0.0.0"); // Statyczny adress IP
+  serverAddress.sin_addr.s_addr = inet_addr("0.0.0.0"); // Nasuchiwanie na wszystkich interfejsach
 
-  // Bindowanie socketu serwera
-  bind(serverSocket, (struct sockaddr *)&serverAddress, sizeof(serverAddress));
+  // Bindowanie adresu serwera
+  if (bind(serverSocket, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0) {
+    perror("Bind failed");
+    close(serverSocket);
+    exit(EXIT_FAILURE);
+  }
 
-  // Ustawienie nasuchiwania serwera na porcie
-  listen(serverSocket, 5);
-  // Log serwera
+  // Start nasłuchiwania
+  if (listen(serverSocket, 5) < 0) {
+    perror("Listen failed");
+    close(serverSocket);
+    exit(EXIT_FAILURE);
+  }
+
   printf("Server is listening on port %d...\n", PORT);
 
-  while (1) {
-    // Akceptowanie paczen
-    int clientSocket = accept(serverSocket, NULL, NULL);
-    // Zamykanie pałaczenia dla nadprogramowych graczy
-    if (clientCount > 1) {
-      printf("Juz jest 2 graczy\n");
-      dummyClient.comand = TOOMANY;
-      send(clientSocket, &(dummyClient), sizeof(dummyClient), 0);
-      close(clientSocket);
-    }
+  fd_set readfds;
+  int max_sd, activity;
+  int clientCount = 0;
 
-    // Obsluga klientow w nowym wądku
-    pthread_t thread;
-    pthread_create(&thread, NULL, (void *)handleClient, (void *)(intptr_t)clientSocket);
-    pthread_detach(thread);
+  // Czyszczenie tablicy deskryptorów
+  FD_ZERO(&readfds);
+  FD_SET(serverSocket, &readfds);
+  max_sd = serverSocket;
+  while (1) {
+
+    // Dodawanie socketu klienta
+    for (int i = 0; i < clientCount; i++) {
+      int sd = clients[i].socket;
+      if (sd > 0)
+        FD_SET(sd, &readfds);
+      if (sd > max_sd)
+        max_sd = sd;
+    }
+    // Czekanie na aktywność w sockecie
+    activity = select(max_sd + 1, &readfds, NULL, NULL, NULL);
+    // Sprawdzanie nadchozących połączeń
+    if (FD_ISSET(serverSocket, &readfds)) {
+      int clientSocket = accept(serverSocket, NULL, NULL);
+      if (clientSocket < 0) {
+        perror("Accept failed");
+        continue;
+      }
+
+      if (clientCount >= 2) {
+        printf("Too many players connected\n");
+        dummyClient.comand = TOOMANY; // TOOMANY 
+        send(clientSocket, &dummyClient, sizeof(dummyClient), 0);
+        close(clientSocket);
+      }
+      // Obsługa klientów w nowym wądku
+      pthread_t thread;
+      pthread_create(&thread, NULL, (void *)handleClient, (void *)(intptr_t)clientSocket);
+      pthread_detach(thread);
+    }
   }
 
   close(serverSocket);
-
   return 0;
 }
